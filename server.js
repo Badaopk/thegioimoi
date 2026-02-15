@@ -411,6 +411,33 @@ app.post('/api/admin/reset-password', isAdmin, async (req, res) => {
         res.json({ message: "Mật khẩu đã về 123456" });
     }
 });
+// 1. Lấy trạng thái bảo trì hiện tại
+app.get('/api/admin/maintenance-status', isAdmin, (req, res) => {
+    res.json({ maintenanceMode: maintenanceMode });
+});
+
+// 2. Bật/Tắt chế độ bảo trì
+app.post('/api/admin/maintenance-toggle', isAdmin, (req, res) => {
+    maintenanceMode = !maintenanceMode; // Đảo trạng thái true/false
+
+    if (maintenanceMode) {
+        // [Nâng cao] Nếu bật bảo trì, đá tất cả người chơi (trừ admin) ra khỏi Socket
+        io.sockets.sockets.forEach((socket) => {
+            const user = socket.request.session.user;
+            if (!user || user.role !== 'admin') {
+                socket.emit('errorMsg', 'Hệ thống bắt đầu bảo trì. Vui lòng quay lại sau!');
+                socket.disconnect(true);
+            }
+        });
+    }
+
+    console.log(`⚠️ [SYSTEM] Chế độ bảo trì: ${maintenanceMode ? 'BẬT' : 'TẮT'}`);
+    res.json({ 
+        success: true, 
+        maintenanceMode: maintenanceMode, 
+        message: maintenanceMode ? "Đã bật bảo trì toàn server." : "Đã tắt bảo trì." 
+    });
+});
 // --- 7. SOCKET.IO: MULTIPLAYER GAMES ---
 io.on('connection', (socket) => {
     const username = socket.request.session.user?.username || `Khách_${socket.id.slice(0,4)}`;
